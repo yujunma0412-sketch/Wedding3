@@ -620,6 +620,63 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // ==========================================
+            // 1. 倒數計時器邏輯 (目標：2027年04月10日 17:00 證婚儀式)
+            // ==========================================
+            const targetDate = new Date('2027-04-10T17:00:00+08:00').getTime();
+            const daysEl = document.getElementById('cd-days');
+            const hoursEl = document.getElementById('cd-hours');
+            const minsEl = document.getElementById('cd-mins');
+            const secsEl = document.getElementById('cd-secs');
+
+            function updateCountdown() {
+                const now = new Date().getTime();
+                const distance = targetDate - now;
+
+                if (distance <= 0) {
+                    daysEl.textContent = '000';
+                    hoursEl.textContent = '00';
+                    minsEl.textContent = '00';
+                    secsEl.textContent = '00';
+                    return;
+                }
+
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                daysEl.textContent = String(days).padStart(3, '0');
+                hoursEl.textContent = String(hours).padStart(2, '0');
+                minsEl.textContent = String(minutes).padStart(2, '0');
+                secsEl.textContent = String(seconds).padStart(2, '0');
+            }
+
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+
+            // ==========================================
+            // 2. 交通指引摺疊面板 (Accordion) 互動
+            // ==========================================
+            const trafficToggle = document.getElementById('traffic-toggle');
+            const trafficPanel = document.getElementById('traffic-panel');
+            const trafficIcon = document.getElementById('traffic-icon');
+
+            if (trafficToggle && trafficPanel && trafficIcon) {
+                trafficToggle.addEventListener('click', () => {
+                    const isOpen = trafficPanel.classList.contains('open');
+                    if (isOpen) {
+                        trafficPanel.classList.remove('open');
+                        trafficIcon.classList.remove('rotate-180');
+                        trafficToggle.setAttribute('aria-expanded', 'false');
+                    } else {
+                        trafficPanel.classList.add('open');
+                        trafficIcon.classList.add('rotate-180');
+                        trafficToggle.setAttribute('aria-expanded', 'true');
+                    }
+                });
+            }
+
+            // ==========================================
             // 3. 智能表單邏輯：參加人數 > 0 才顯示飲食習慣
             // ==========================================
             const guestsInput = document.getElementById('entry_422160171');
@@ -627,81 +684,82 @@
             const diningGroup = document.getElementById('conditional-dining-group');
             const dietaryRadios = document.querySelectorAll('input[name="entry.1937087665"]');
 
-            function evaluateDiningVisibility() {
+            function toggleDiningField() {
                 const count = parseInt(guestsInput.value, 10);
                 if (!isNaN(count) && count > 0) {
                     diningGroup.classList.remove('hidden');
+                    dietaryRadios.forEach(radio => radio.required = true);
                 } else {
                     diningGroup.classList.add('hidden');
                     dietaryRadios.forEach(radio => {
+                        radio.required = false;
                         radio.checked = false;
                     });
                 }
             }
 
-            guestsInput.addEventListener('input', evaluateDiningVisibility);
+            if (guestsInput) {
+                guestsInput.addEventListener('input', toggleDiningField);
+            }
 
-            // 若選擇「不克參與」，自動將人數設為 0 並收合飲食欄位
-            attendanceSelect.addEventListener('change', () => {
-                if (attendanceSelect.value === '不克參與') {
-                    guestsInput.value = 0;
-                    evaluateDiningVisibility();
-                } else if (attendanceSelect.value === '準時赴約' && (guestsInput.value === '0' || guestsInput.value === '')) {
-                    guestsInput.value = 1;
-                    evaluateDiningVisibility();
-                }
-            });
+            if (attendanceSelect) {
+                attendanceSelect.addEventListener('change', (e) => {
+                    if (e.target.value === '不克參與') {
+                        guestsInput.value = 0;
+                        toggleDiningField();
+                    }
+                });
+            }
 
             // ==========================================
-            // 4. 隱藏式 Iframe 表單送出與回饋 Modal 控制
+            // 4. 隱藏式 Iframe 表單提交與成功提示視窗
             // ==========================================
             const rsvpForm = document.getElementById('rsvp-form');
-            const submitBtn = document.getElementById('submit-btn');
-            const modal = document.getElementById('custom-modal');
+            const hiddenIframe = document.getElementById('hidden_iframe');
+            const customModal = document.getElementById('custom-modal');
             const closeModalBtn = document.getElementById('close-modal-btn');
-            let isSubmitted = false;
+            const submitBtn = document.getElementById('submit-btn');
+            let isSubmitting = false;
 
-            rsvpForm.addEventListener('submit', () => {
-                isSubmitted = true;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '資料傳送中... <span class="font-en tracking-widest ml-1">SENDING</span>';
-
-                // 確保若人數為 0 時，不送出飲食習慣數值
-                const count = parseInt(guestsInput.value, 10);
-                if (isNaN(count) || count <= 0) {
-                    dietaryRadios.forEach(radio => {
-                        radio.disabled = true;
-                    });
-                }
-
-                // 延遲顯示成功提示視窗並重置表單（確保表單已透過 hidden_iframe 送出）
-                setTimeout(() => {
-                    if (isSubmitted) {
-                        modal.classList.remove('hidden');
-                        modal.classList.add('flex');
-                        rsvpForm.reset();
-                        dietaryRadios.forEach(radio => {
-                            radio.disabled = false;
-                        });
-                        evaluateDiningVisibility();
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '送出出席回函 <span class="font-en tracking-widest ml-1">SUBMIT</span>';
-                        isSubmitted = false;
+            if (rsvpForm && hiddenIframe) {
+                rsvpForm.addEventListener('submit', () => {
+                    isSubmitting = true;
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '資料傳送中... SENDING';
                     }
-                }, 900);
-            });
+                });
 
-            closeModalBtn.addEventListener('click', () => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            });
+                hiddenIframe.addEventListener('load', () => {
+                    if (isSubmitting) {
+                        isSubmitting = false;
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '送出出席回函 <span class="font-en tracking-widest ml-1">SUBMIT</span>';
+                        }
+                        if (customModal) {
+                            customModal.classList.remove('hidden');
+                            customModal.classList.add('flex');
+                        }
+                        rsvpForm.reset();
+                        toggleDiningField();
+                    }
+                });
+            }
 
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
-                }
-            });
+            if (closeModalBtn && customModal) {
+                closeModalBtn.addEventListener('click', () => {
+                    customModal.classList.add('hidden');
+                    customModal.classList.remove('flex');
+                });
+
+                customModal.addEventListener('click', (e) => {
+                    if (e.target === customModal) {
+                        customModal.classList.add('hidden');
+                        customModal.classList.remove('flex');
+                    }
+                });
+            }
         });
     </script>
 </body>
